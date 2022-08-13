@@ -5,7 +5,7 @@
 
 constexpr char port_place_holder[] =
 #if COM
-    "\\COM%d";
+    "\\\\.\\COM%d";
 #elif TTY
     "/dev/ttyUSB%d";
 #endif
