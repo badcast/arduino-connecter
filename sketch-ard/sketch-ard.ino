@@ -1,4 +1,3 @@
-#include <LiquidCrystal_I2C.h>  // подключаем библиотеку для QAPASS 1602
 #include <Wire.h>               // библиотека для управления устройствами по I2C
 
 #include "general-code.hpp"

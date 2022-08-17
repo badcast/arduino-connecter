@@ -10,8 +10,6 @@
 #include <stdexcept>
 #include <string>
 
-#include "general-code.hpp"
-
 #ifdef __MSCVER__ || __WINRT__
 #define COM 1
 #else  // other, LINUX, UNIX, MACOS
@@ -39,6 +37,9 @@ enum PortID {
 };
 
 class Connector;
+
+// device memory pointer
+struct dptr;
 
 class ConnectorUtility;
 
@@ -70,19 +71,18 @@ class Connector {
 
    private:
     bool init();
-    int command_read(command_responce* commandResponce, int sz);
-    int command_write(const void* buffer, int sz);
-    bool send_wait(const command_request* requestCmd, command_responce* responceCmd, uint8_t size_req, uint8_t size_resp);
     void reset();
 
    public:
     Connector();
     Connector(const Port& port);
 
+    inline const int handle() const;
+
     // check verify connection status
-    bool isConnected();
+    bool isConnected() const;
     // give connected port
-    Port getPort();
+    Port port();
     // find free port, and connect - auto
     bool connect();
     // connect to port
@@ -95,13 +95,20 @@ class Connector {
 
     // this function for set information to device
     template <typename Request>
-    bool request_set(const Request& req);
+    bool set(const Request& req);
+
+
+    template <typename Request>
+    bool set(const Request& request, const char * buffer);
 
     // this function for get information from device
     template <typename T1, typename T2>
-    bool request_get(const T1& request, T2& responce);
+    bool get(const T1& request, T2& responce);
 
-    const DeviceData& data();
+    const DeviceData& data() const;
+
+    // check connected state
+    operator bool() const;
 
     friend class ConnectorUtility;
 };
@@ -112,26 +119,35 @@ class ConnectorUtility {
    public:
     ConnectorUtility(Connector& device);
 
+    const bool connected() const;
+
     // get state led
     bool isBacklight();
     // set state led's
     void setBacklight(bool state);
     // show text to LCD
-    void printText(std::string text);
+    void print(const std::string& text);
 
     void setCursorView(bool state);
 
     void setCursorPos(int row, int col);
 
-    //get row's from lcd display
+    // get row's from lcd display
     int getRows();
 
-    //get cell's from lcd display
+    // get cell's from lcd display
     int getCols();
 
     // clear text from LCD
     void clear();
-};
 
-void delay(int ms);
+    // memory allocate from device
+    dptr* malloc(uint8_t size);
+
+    // memory free from device
+    void mfree(dptr* memory);
+
+    dptr* memset(dptr* dest, int value, int size);
+    dptr* memcpy(dptr* dest, const dptr* source, int size);
+};
 }  // namespace connector

@@ -3,6 +3,8 @@
 #include <chrono>
 #include <thread>
 
+#include "general-code.hpp"
+
 constexpr char port_place_holder[] =
 #if COM
     "\\\\.\\COM%d";
@@ -25,7 +27,7 @@ Port::Port(PortID port) : _id(port) {}
 
 std::string Port::name() {
     std::string _str = fullname();
-    return _str.c_str() + _str.find_last_of(determ);
+    return _str.c_str() + _str.find_last_of(determ) + 1;
 }
 
 std::string Port::fullname() {
@@ -36,31 +38,27 @@ std::string Port::fullname() {
 
 const PortID Port::getPortID() { return _id; }
 
-void connector::delay(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
+void delay(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
 
-int connector::millis() {
+int millis() {
     using namespace std::chrono;
     uint64_t tms = (duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
     static uint64_t tcapture = tms;
     return static_cast<int>(tms - tcapture);
 }
 
-int Connector::command_write(const void* buffer, int sz) {
+int command_write(int fd, const void* buffer, int sz) {
     // write attribute for indentification
-    int nwrit = write(_fd, buffer, sz);
-    tcdrain(_fd);  // sync
+    int nwrit = send(fd, buffer, sz);
+    tcdrain(fd);  // sync
     return nwrit;
 }
 
-int Connector::command_read(command_responce* commandResponce, int sz) {
-    return connector::read_timeout(_fd, commandResponce, sz);
-}
-
-bool Connector::send_wait(const command_request* requestCmd, command_responce* responceCmd, uint8_t size_req,
-                          uint8_t size_resp) {
+bool device_awake(Connector& con, const command_request* requestCmd, command_responce* responceCmd, uint8_t size_req,
+                  uint8_t size_resp, const char* buffer = nullptr, int size = -1) {
     int alpha;
 
-    if (!isConnected()) {
+    if (!con.isConnected()) {
         throw std::runtime_error("Device is not connected");
     }
 
@@ -71,40 +69,53 @@ bool Connector::send_wait(const command_request* requestCmd, command_responce* r
     } else if (responceCmd == nullptr)
         throw std::runtime_error("responceCmd is null");
 
-    tcflush(_fd, TCIOFLUSH);  // flushing
+    tcflush(con.handle(), TCIOFLUSH);  // flushing
 
-    // send content
-    alpha = connector::send(_fd, &size_req, 1);
+    // send content size
+    alpha = send(con.handle(), &size_req, 1);
 
     // send test echo
-    if (!connector::echo_test(_fd)) {
+    if (!echo_test(con.handle())) {
         return false;
     }
 
     delay(10);  // custom delay
 
     // send request
-    alpha = connector::send(_fd, requestCmd, size_req);
+    alpha = send(con.handle(), requestCmd, size_req);
+    // send buffer
+    if (buffer) {
+        if (size == -1) size = strlen(buffer);
+        uint8_t* q = (uint8_t*)malloc(1);
+        alpha = read_timeout(con.handle(), q, 1);
+        free(q);
+        alpha = read_timeout(con.handle(), responceCmd, size_resp);
+    }
 
     // send test echo
-    if (!echo_test(_fd)) {
+    if (!echo_test(con.handle())) {
         return false;
     }
 
-    alpha = command_read(responceCmd, size_resp);
+    alpha = read_timeout(con.handle(), responceCmd, size_resp);
     if (!(alpha == size_resp)) return false;
 
     return true;
 }
 
 template <typename T1, typename T2>
-bool Connector::request_get(const T1& request, T2& responce) {
-    return send_wait(&request, &responce, sizeof request, sizeof responce);
+bool Connector::get(const T1& request, T2& responce) {
+    return device_awake(*this, &request, &responce, sizeof request, sizeof responce);
 }
 
 template <typename Request>
-bool Connector::request_set(const Request& req) {
-    return send_wait(&req, nullptr, sizeof req, 0);
+bool Connector::set(const Request& req) {
+    return device_awake(*this, &req, nullptr, sizeof req, 0);
+}
+
+template <typename Request>
+bool Connector::set(const Request& request, const char* buffer) {
+    return device_awake(*this, &request, nullptr, sizeof request, 0, buffer);
 }
 
 void Connector::reset() {
@@ -115,7 +126,7 @@ void Connector::reset() {
 
 bool Connector::init() {
     uint8_t attrib;
-    if (!connector::read_timeout(_fd, &attrib, 1, 3000)) {
+    if (!read_timeout(_fd, &attrib, 1, 3000)) {
         return false;
     }
 
@@ -132,9 +143,11 @@ Connector::Connector(const Port& port) : __port(port) {
     if (!connect(__port)) throw std::runtime_error("connection failed");
 }
 
-bool Connector::isConnected() { return _fd != ~0; }
+const int Connector::handle() const { return _fd; }
 
-Port Connector::getPort() { return __port; }
+bool Connector::isConnected() const { return _fd != ~0; }
+
+Port Connector::port() { return __port; }
 
 bool Connector::connect() {
     // auto connect
@@ -198,8 +211,10 @@ bool Connector::connect(Port port) {
     }
 
     if (!status) {
-        if (_fd != -1) close(_fd);
-        _fd = ~0;
+        if (_fd != -1)
+            close(_fd);
+        else
+            _fd = ~0;
     }
     return status;
 }
@@ -214,10 +229,10 @@ void Connector::disconnect() throw() {
 }
 
 bool Connector::update() {
-    RequestStatus req;
-    ResponceStatus resp;
+    RequestInitStatus req;
+    ResponceInitStatus resp;
 
-    bool alpha = request_get(req, resp);
+    bool alpha = get(req, resp);
     if (alpha) {
         devdata.memorySize = resp.memsize;
         devdata.memoryFree = resp.memfree;
@@ -227,60 +242,31 @@ bool Connector::update() {
     return alpha;
 }
 
-const DeviceData& Connector::data() {
+const DeviceData& Connector::data() const {
     if (!isConnected()) throw std::runtime_error("Device not connected");
     return devdata;
 }
 
-// declaration
-
-int connector::read_timeout(int fd, void* buffer, const uint16_t& len, int timeout) {
-    uint8_t alpha;
-    int nreaded = 0;
-    timeout = millis() + timeout;
-    do {
-        // read left
-        alpha = read(fd, (reinterpret_cast<int8_t*>(buffer) + nreaded), len - nreaded);
-        if (alpha == -1) alpha = 0;
-        nreaded += alpha;
-    } while (timeout > millis() && nreaded < len);
-    return nreaded;
-}
-
-uint16_t connector::send(int fd, const void* buffer, const uint16_t& len) {
-    uint16_t alpha = write(fd, buffer, len);
-
-    tcdrain(fd);  // sync
-
-    return alpha;
-}
-
-inline bool connector::echo_input(int fd) {
-    uint8_t echo;
-    return read_timeout(fd, &echo, 1, echo_timeout) && echo == cmd_echo;
-}
-
-inline bool connector::echo_output(int fd) { return send(fd, &cmd_echo, 1); }
-
-// state is connected from "echo"
-bool connector::echo_test(int fd) { return echo_input(fd) && echo_output(fd); }
-
 ConnectorUtility::ConnectorUtility(Connector& device) : _dev(&device) {}
+
+const bool ConnectorUtility::connected() const { return (*_dev); }
 
 bool ConnectorUtility::isBacklight() {
     RequestBacklight rb;
     ResponceBacklight rs;
-    _dev->request_get(rb, rs);
+    _dev->get(rb, rs);
     return rs.mode;
 }
 
 void ConnectorUtility::setBacklight(bool state) {
     RequestBacklight rb(state);
-    _dev->request_set(rb);
+    _dev->set(rb);
 }
 
-void ConnectorUtility::printText(std::string text) {
+void ConnectorUtility::print(const std::string& text) {
     // TODO: next function
+    RequestText rq(text.size());
+    bool res = _dev->set(rq, text.c_str());
 }
 
 void ConnectorUtility::setCursorView(bool state) {
@@ -298,3 +284,14 @@ int ConnectorUtility::getCols() { return _dev->data().lcdCols; }
 void ConnectorUtility::clear() {
     // TODO: next function
 }
+
+connector::dptr* ConnectorUtility::malloc(uint8_t size) {
+    RequestMalloc req(size);
+    ResponceMalloc rem;
+    bool result = _dev->get(req, rem);
+    return reinterpret_cast<connector::dptr*>(rem.pointer);
+}
+
+void ConnectorUtility::mfree(dptr* memory) {}
+
+Connector::operator bool() const { return isConnected(); }

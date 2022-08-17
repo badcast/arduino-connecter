@@ -1,54 +1,59 @@
+#include <errno.h>
+#include <string.h>
+
 #include <iostream>
 
-#include "connector.h"
+#include "connector-pipe.h"
 
-const char defaultUsbTty[] = "/dev/ttyUSB%d";
+constexpr int CMDN = 3;
+const char *commands_details[CMDN][2] = {
+    {"--help", "Show this help"}, {"--version", "Show version"}, {"-p", "Print text to connected device"}};
+const char errcmd[] = "Invalid command \"%s\"\n";
 
-void awake(connector::Connector& con);
+void showhelp() {
+    for (int x = 0; x < CMDN; ++x) {
+        std::cout << commands_details[x][0] << "\t" << commands_details[x][1] << std::endl;
+    }
+    exit(EXIT_SUCCESS);
+}
 
-int main() {
-    int x;
-    bool result = false;
-    connector::Connector con;
+void showVersion() {
+    std::cout << "Arduino connector version: 1.0.0" << std::endl;
 
-    std::cout << "Openning usb port ..." << std::endl;
+    exit(EXIT_SUCCESS);
+}
 
-    // retrive
-    for (x = 0; !result && x < 5; ++x) {
-        // find free port, and connect to
-        result = con.connect();
+int main(int argc, char *argv[]) {
+    std::string argVal;
+    // show help
+    if (argc == 1 || !strncmp(argv[1], commands_details[0][0], 3)) {
+        showhelp();
+    }
 
-        if (result) {
-            std::cout << "port: " << con.getPort().name() << " connected!" << std::endl;
+    // show version
+    if (!strncmp(argv[1], commands_details[1][0], 3)) {
+        showVersion();
+    }
 
-            std::cout << "Memory size: " << con.data().memorySize << std::endl;
-            std::cout << "Memory free: " << con.data().memoryFree << std::endl;
-            std::cout << "Memory used: " << (con.data().memorySize - con.data().memoryFree) << std::endl;
-            std::cout << "LCD Rows: " << con.data().lcdRows << ", Cols: " << con.data().lcdCols << std::endl;
-
-            awake(con);
-
-        } else {
-            std::cout << "Error opening port, retrive " << x + 1 << std::endl;
-            connector::delay(1000);
+    for (int x = 1; argVal.empty() && x < argc; ++x) {
+        for (int y = 2; y < CMDN; ++y) {
+            if (!strcmp(argv[x], commands_details[y][0])) {
+                argVal = argv[x + 1];
+                break;
+            }
         }
     }
 
-    if (!result) {
-        // todo: error
-        std::cout << "5 retrive opening usb port failed. Exiting." << std::endl;
+    if (argVal.empty()) {
+        printf(errcmd, argv[1]);
+        showhelp();
+    }
+
+    if (!connect_pipe()) {
         return EXIT_FAILURE;
     }
 
-    con.disconnect();
-    std::cout << "Port disconnected!" << std::endl;
-}
+    send_message(argVal.data(), argVal.size());
 
-void awake(connector::Connector& con) {
-    connector::ConnectorUtility util(con);
-
-    while (1) {
-        util.setBacklight(false);
-        util.setBacklight(true);
-    }
+    return EXIT_SUCCESS;
 }
