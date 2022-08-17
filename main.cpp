@@ -18,8 +18,8 @@ int main() {
         // find free port, and connect to
         result = con.connect();
 
-        if (result) {
-            std::cout << "port: " << con.getPort().name() << " connected!" << std::endl;
+        if (con) {
+            std::cout << "port: " << con.port().name() << " connected!" << std::endl;
 
             std::cout << "Memory size: " << con.data().memorySize << std::endl;
             std::cout << "Memory free: " << con.data().memoryFree << std::endl;
@@ -47,8 +47,21 @@ int main() {
 void awake(connector::Connector& con) {
     connector::ConnectorUtility util(con);
 
+    std::cout << "Check memory allocs: ";
+    con.update();
+    int memsz = con.data().memoryFree;
+    int memsz0;
+    auto mem = util.malloc(100);
+
+    con.update();
+    memsz0 = con.data().memoryFree;
+
+    std::cout << ((memsz == memsz0) ? "not allocated" : "allocated") << std::endl;
+
     while (1) {
         util.setBacklight(false);
         util.setBacklight(true);
+
+        util.printText("xx");
     }
 }
