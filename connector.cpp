@@ -38,7 +38,7 @@ std::string Port::fullname() {
 
 const PortID Port::getPortID() { return _id; }
 
-void connector::delay(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
+void delay(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
 
 int millis() {
     using namespace std::chrono;
@@ -248,11 +248,10 @@ void ConnectorUtility::setBacklight(bool state) {
     _dev->set(rb);
 }
 
-void ConnectorUtility::printText(const std::string& text) {
+void ConnectorUtility::print(const std::string& text) {
     // TODO: next function
     RequestText rq(text.c_str(), text.size());
     bool res = _dev->set(rq);
-    int cc = 0;
 }
 
 void ConnectorUtility::setCursorView(bool state) {

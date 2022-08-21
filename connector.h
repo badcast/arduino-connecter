@@ -122,7 +122,7 @@ class ConnectorUtility {
     // set state led's
     void setBacklight(bool state);
     // show text to LCD
-    void printText(const std::string& text);
+    void print(const std::string& text);
 
     void setCursorView(bool state);
 
@@ -144,8 +144,6 @@ class ConnectorUtility {
     void mfree(dptr* memory);
 
     dptr* memset(dptr* dest, int value, int size);
-    dptr* memcpy(dptr* dest, const void* source, int size);
+    dptr* memcpy(dptr* dest, const dptr* source, int size);
 };
-
-void delay(int ms);
 }  // namespace connector
