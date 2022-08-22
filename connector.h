@@ -97,6 +97,10 @@ class Connector {
     template <typename Request>
     bool set(const Request& req);
 
+
+    template <typename Request>
+    bool set(const Request& request, const char * buffer);
+
     // this function for get information from device
     template <typename T1, typename T2>
     bool get(const T1& request, T2& responce);

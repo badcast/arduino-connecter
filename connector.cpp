@@ -55,7 +55,7 @@ int command_write(int fd, const void* buffer, int sz) {
 }
 
 bool device_awake(Connector& con, const command_request* requestCmd, command_responce* responceCmd, uint8_t size_req,
-                  uint8_t size_resp) {
+                  uint8_t size_resp, const char* buffer = nullptr, int size = -1) {
     int alpha;
 
     if (!con.isConnected()) {
@@ -71,7 +71,7 @@ bool device_awake(Connector& con, const command_request* requestCmd, command_res
 
     tcflush(con.handle(), TCIOFLUSH);  // flushing
 
-    // send content
+    // send content size
     alpha = send(con.handle(), &size_req, 1);
 
     // send test echo
@@ -83,6 +83,14 @@ bool device_awake(Connector& con, const command_request* requestCmd, command_res
 
     // send request
     alpha = send(con.handle(), requestCmd, size_req);
+    // send buffer
+    if (buffer) {
+        if (size == -1) size = strlen(buffer);
+        uint8_t *q = (uint8_t*)malloc(1);
+        alpha = read_timeout(con.handle(), q, 1);
+        free(q);
+        alpha = read_timeout(con.handle(), responceCmd, size_resp);
+    }
 
     // send test echo
     if (!echo_test(con.handle())) {
@@ -103,6 +111,11 @@ bool Connector::get(const T1& request, T2& responce) {
 template <typename Request>
 bool Connector::set(const Request& req) {
     return device_awake(*this, &req, nullptr, sizeof req, 0);
+}
+
+template <typename Request>
+bool Connector::set(const Request& request, const char* buffer) {
+    return device_awake(*this, &request, nullptr, sizeof request, 0, buffer);
 }
 
 void Connector::reset() {
@@ -250,8 +263,8 @@ void ConnectorUtility::setBacklight(bool state) {
 
 void ConnectorUtility::print(const std::string& text) {
     // TODO: next function
-    RequestText rq(text.c_str(), text.size());
-    bool res = _dev->set(rq);
+    RequestText rq(text.size());
+    bool res = _dev->set(rq, text.c_str());
 }
 
 void ConnectorUtility::setCursorView(bool state) {
