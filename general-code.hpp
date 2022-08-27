@@ -242,33 +242,35 @@ void arduino_reply(command_request* request) {
           // *** RequestText *** *** *** *** *** *** *** ***
           //#define RESPONCE (reinterpret_cast<ResponceText*>(pokets))
 #define REQUEST (reinterpret_cast<RequestText*>(request))
-        case GeneralCommand::LCD_TEXT:
-          lcd.clear();
-          size = REQUEST->_length;
-          pokets = malloc(sizeof(REQUEST->_length));
-          memcpy(pokets, &REQUEST->_length, sizeof(REQUEST->_length));
+        case GeneralCommand::LCD_TEXT: {
+            lcd.clear();
+            /*
+            size = REQUEST->_length;
+            pokets = malloc(sizeof(REQUEST->_length));
+            memcpy(pokets, &REQUEST->_length, sizeof(REQUEST->_length));
 
-          switch (cmdMethod) {
-            case GET:
+            switch (cmdMethod) {
+              case GET:
 
-              break;
-            case SET:
-              if (!size)
-                lcd.clear();
-              else {
-                lcd.clear();
-                //int read_timeout(ARG_FD_DEF void* buffer, const uint16_t& len, int timeout) {
+                break;
+              case SET:
+                if (!size)
+                  lcd.clear();
+                else {
+                  lcd.clear();
+                  //int read_timeout(ARG_FD_DEF void* buffer, const uint16_t& len, int timeout) {
 
-                char *buf = (char*)malloc(size + 1);
-                size = read_timeout(buf, size, 3000);
-                buf[size] = '\0';
-                lcd.print(buf);
-                free(buf);
-              }
-              break;
+                  char *buf = (char*)malloc(size + 1);
+                  size = read_timeout(buf, size, 3000);
+                  buf[size] = '\0';
+                  lcd.print(buf);
+                  free(buf);
+                }
+                break;
+            }*/
+                      break;
           }
 
-          break;
       }
   }
 

@@ -14,7 +14,7 @@ void delay(int ms);
 void out(int) {
     forclyFinishing = true;
     close_pipe();
-    printf("daemon exited");
+    printf("\ndaemon exited\n");
     exit(EXIT_FAILURE);
 }
 
@@ -31,7 +31,7 @@ int main() {
 
     if (!create_pipe()) {
         std::cout << "failed" << std::endl;
-        return EXIT_FAILURE;
+        out(-1);
     }
 
     std::cout << "started!" << std::endl;
@@ -58,13 +58,17 @@ int main() {
         }
     }
 
+
+
     if (!result) {
         // todo: error
         std::cout << "5 retrive opening usb port failed. Exiting." << std::endl;
-        return EXIT_FAILURE;
+        out(-1);
     }
 
     con.disconnect();
+
+
     std::cout << "Port disconnected!" << std::endl;
 }
 
