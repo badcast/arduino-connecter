@@ -20,7 +20,7 @@ inline bool status() {
     bool status;
     if (!(status = shm > -1)) {
         if (errno == 2) {
-            std::cout << "daemon not started. Check systemctl status connectord" << std::endl;
+            std::cout << "daemon not started. Check systemctl status "<< DAEMON_NAME << std::endl;
         } else
             perror("shm");
     }
